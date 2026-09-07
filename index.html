@@ -721,6 +721,7 @@
         let activeUser = null; 
         let activeOrden = null;
         let isEditing = false;
+        let pestanaOrigen = 'programacion';
 
         window.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
@@ -1085,6 +1086,7 @@
 
         // --- FORMULARIOS NUEVOS ---
         function cargarFormularioNuevo(ordenId) {
+            pestanaOrigen = 'programacion';
             activeOrden = rawDatabase.programacion.find(p => p.ID_Orden === ordenId);
             if (!activeOrden) return;
 
@@ -1096,6 +1098,9 @@
 
         // --- FORMULARIO EDICION ---
         function cargarFormularioEdicion(ordenId) {
+            const secDash = document.getElementById('tab-dashboard');
+            pestanaOrigen = (!secDash.classList.contains('hidden')) ? 'dashboard' : 'programacion';
+            
             activeOrden = rawDatabase.programacion.find(p => p.ID_Orden === ordenId);
             if (!activeOrden) return;
 
@@ -1235,7 +1240,7 @@
         }
 
         function cancelarRegistro() {
-            switchTab(isEditing ? 'dashboard' : 'programacion');
+            switchTab(pestanaOrigen);
         }
 
         // --- RENDIMIENTOS ---
