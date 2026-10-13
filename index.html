@@ -911,26 +911,26 @@
                 const isAdmin = activeUser && activeUser.rol === "Admin";
                 const actionLabel = isAdmin ? "Editar" : "Ver";
                 const icon = isAdmin ? "edit-3" : "eye";
-
+            
                 const insReal = parseFloat(p.Insumo_Real) || 0;
-
+            
                 const unidadItem = (p.Unidad || '').trim().toLowerCase();
                 let masaBaseKg = 0;
-
+            
                 // Si la orden viene en Kg, la base es el insumo real.
                 // Si viene en unidades (und, pza, etc.), la base es el pesaje registrado en Peso_Total_Kg.
                 if (unidadItem === 'kg' || unidadItem === 'kilos') {
                     masaBaseKg = insReal;
                 } else {
-                    masaBaseKg = parseFloat(p.Peso_Total_Kg) || 0;
+                    masaBaseKg = parseFloat(p.Peso_Total_Kg || p.PESO_TOTAL_KG || p.peso_total_kg) || 0;
                 }
-
+            
                 let pctBasura = 0;
                 let pctTransf = 0;
-
+            
                 const mermasOrden = rawDatabase.mermas ? rawDatabase.mermas.filter(m => m.ID_Orden === p.ID_Orden) : [];
                 
-                // Calculamos el porcentaje usando masaBaseKg en lugar de insReal directo
+                // Calculamos los porcentajes de merma usando masaBaseKg
                 if (masaBaseKg > 0) {
                     let totalBasura = 0;
                     let totalTransf = 0;
@@ -941,14 +941,14 @@
                     pctBasura = (totalBasura / masaBaseKg) * 100;
                     pctTransf = (totalTransf / masaBaseKg) * 100;
                 }
-
-                // Cálculo de Reducción
+            
+                // Cálculo de Reducción (usando masaBaseKg para mantener congruencia en kilos)
                 const insRed = parseFloat(p.Insumo_Reducido) || 0;
                 let pctReduccion = 0;
-                if (insReal > 0 && insRed > 0 && insRed < insReal) {
-                    pctReduccion = ((insReal - insRed) / insReal) * 100;
+                if (masaBaseKg > 0 && insRed > 0 && insRed < masaBaseKg) {
+                    pctReduccion = ((masaBaseKg - insRed) / masaBaseKg) * 100;
                 }
-
+            
                 rows.innerHTML += `
                     <tr class="hover:bg-slate-50/80 transition-colors">
                         <td class="px-3 py-2.5 font-bold text-indigo-600 whitespace-nowrap">${p.ID_Orden}</td>
@@ -972,6 +972,7 @@
                     </tr>
                 `;
             });
+            
             lucide.createIcons();
         }
 
@@ -1140,11 +1141,9 @@
 
             // 2. Localizar registro previo en Produccion_Real si existe
             const realData = rawDatabase.produccionReal.find(p => p.ID_Orden === orden.ID_Orden);
-
-            // 3. Control de permisos por Rol (Admin vs Normal)
             const isNormal = !activeUser || activeUser.rol !== "Admin";
 
-            // Autocompletar insumos
+            // Insumo solicitado
             const insProveedorCargado = realData ? parseFloat(realData.Insumo_Proveedor || 0) : 0;
             document.getElementById('insumo-proveedor').value = insProveedorCargado > 0 ? insProveedorCargado : orden.Cantidad_Planificada;
             document.getElementById('insumo-real').value = realData ? (realData.Insumo_Real || '') : '';
@@ -1153,6 +1152,7 @@
             const insReducidoCargado = realData ? (realData.Insumo_Reducido || '') : '';
             document.getElementById('insumo-reducido').value = insReducidoCargado;
 
+            // --- CONTROL DEL CAMPO DE PESO TOTAL ENTRADA ---
             const unidadOrden = (orden.Unidad || '').trim().toLowerCase();
             const esPorUnidades = unidadOrden !== 'kg' && unidadOrden !== 'kilos';
             
@@ -1161,16 +1161,14 @@
 
             if (esPorUnidades) {
                 boxPesoKg.classList.remove('hidden');
-                
                 const pesoGuardado = realData ? (realData.Peso_Total_Kg || realData.PESO_TOTAL_KG || realData.peso_total_kg || '') : '';
-                inputPesoKg.value = realData ? (realData.Peso_Total_Kg || '') : '';
+                inputPesoKg.value = pesoGuardado ? parseFloat(pesoGuardado) : '';
                 inputPesoKg.disabled = isNormal;
             } else {
                 boxPesoKg.classList.add('hidden');
                 inputPesoKg.value = '';
             }
 
-            // Bloqueo de inputs si es usuario normal
             document.getElementById('insumo-proveedor').disabled = isNormal;
             document.getElementById('insumo-real').disabled = isNormal;
             document.getElementById('insumo-reducido').disabled = isNormal;
@@ -1256,15 +1254,21 @@
         function calcularRendimiento() {
             const real = parseFloat(document.getElementById('insumo-real').value) || 0;
             const logrados = parseFloat(document.getElementById('empacados-logrados').value) || 0;
-
-            // Añadir al inicio o final de calcularRendimiento():
-            const insRealVal = parseFloat(document.getElementById('insumo-real').value) || 0;
             const insRedVal = parseFloat(document.getElementById('insumo-reducido').value) || 0;
-            const txtReduccion = document.getElementById('live-porcentaje-reduccion');
+            const pesoEntradaVal = parseFloat(document.getElementById('insumo-peso-kg').value) || 0;
+
+            // Determinar cuántos KILOS entraron realmente al proceso
+            const unidadOrden = (activeOrden && activeOrden.Unidad ? activeOrden.Unidad : '').trim().toLowerCase();
+            const esPorUnidades = unidadOrden !== 'kg' && unidadOrden !== 'kilos';
             
+            // Si es por unidades usamos el peso en Kg; si no, usamos el insumo real
+            const masaEntradaKg = esPorUnidades ? pesoEntradaVal : real;
+
+            // Cálculo en caliente de % de Reducción
+            const txtReduccion = document.getElementById('live-porcentaje-reduccion');
             if (txtReduccion) {
-                if (insRealVal > 0 && insRedVal > 0 && insRedVal < insRealVal) {
-                    const pct = (((insRealVal - insRedVal) / insRealVal) * 100).toFixed(1);
+                if (masaEntradaKg > 0 && insRedVal > 0 && insRedVal < masaEntradaKg) {
+                    const pct = (((masaEntradaKg - insRedVal) / masaEntradaKg) * 100).toFixed(1);
                     txtReduccion.innerText = `${pct}%`;
                 } else {
                     txtReduccion.innerText = "0.0% (Sin reducción)";
@@ -1273,7 +1277,6 @@
 
             const transRecibida = parseFloat(document.getElementById('live-estado').dataset.transRecibida) || 0;
             const origenTrans = document.getElementById('live-estado').dataset.origenTrans || "";
-
             const totalInsumoAProcesar = real + transRecibida;
 
             const liveEstado = document.getElementById('live-estado');
@@ -1503,7 +1506,7 @@
                     insumo_prov: insProv,
                     insumo_real: insReal,
                     insumo_reducido: insRed,
-                    peso_total_kg: pesoTotalKg,
+                    peso_total_kg: pesoTotalKg, // <--- Enviado al backend
                     unidad: activeOrden.Unidad,
                     empacados: empLogrados,
                     estado_rend: empLogrados > 0 ? liveEstadoText : "Esperando Datos",
@@ -1512,7 +1515,7 @@
                 }
             };
 
-            // ACTUALIZACIÓN EN CACHÉ LOCAL (Inmediata)
+            // ACTUALIZACIÓN INMEDIATA EN MEMORIA LOCAL (Caché)
             let itemReal = rawDatabase.produccionReal.find(p => p.ID_Orden === activeOrden.ID_Orden);
             if (itemReal) {
                 itemReal.Insumo_Proveedor = insProv;
@@ -1543,17 +1546,16 @@
                     ID_Orden: activeOrden.ID_Orden,
                     Tipo_Merma: m.tipo,
                     Cantidad: m.cantidad,
-                    Unidad: activeOrden.Unidad,
+                    Unidad: "Kg",
                     Producto_Destino: m.destino
                 });
             });
 
-            // Transición instantánea en UI
             showToast(`¡Guardado exitosamente! Estado: ${estadoRegistroFinal}`, "success");
             applyFiltersProg();
             switchTab('programacion');
 
-            // Envío asíncrono a Google Sheets en segundo plano
+            // Envío en segundo plano
             try {
                 fetch(API_URL, {
                     method: 'POST',
