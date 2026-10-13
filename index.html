@@ -1115,7 +1115,14 @@
                 document.getElementById('insumo-proveedor').value = parseFloat(realData.Insumo_Proveedor) || activeOrden.Cantidad_Planificada;
                 document.getElementById('insumo-real').value = parseFloat(realData.Insumo_Real) || '';
                 document.getElementById('empacados-logrados').value = parseFloat(realData.Empacados_Logrados) || '';
+
+                const inputPeso = document.getElementById('insumo-peso-kg');
+                if (inputPeso) {
+                    const pesoGuardado = realData.Peso_Total_Kg || realData.PESO_TOTAL_KG || realData.peso_total_kg || '';
+                    inputPeso.value = pesoGuardado ? parseFloat(pesoGuardado) : '';
+                }
             }
+            
 
             calcularRendimiento();
             switchTab('registro');
@@ -1154,6 +1161,8 @@
 
             if (esPorUnidades) {
                 boxPesoKg.classList.remove('hidden');
+                
+                const pesoGuardado = realData ? (realData.Peso_Total_Kg || realData.PESO_TOTAL_KG || realData.peso_total_kg || '') : '';
                 inputPesoKg.value = realData ? (realData.Peso_Total_Kg || '') : '';
                 inputPesoKg.disabled = isNormal;
             } else {
