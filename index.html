@@ -209,6 +209,13 @@
                             <tbody class="divide-y divide-gray-100" id="produccion-real-rows"></tbody>
                         </table>
                     </div>
+                    <!-- Paginación Dashboard -->
+                    <div class="px-5 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 bg-gray-50/50">
+                        <div id="dash-pagination-info">Mostrando 0 de 0 registros</div>
+                        <div class="flex items-center space-x-1" id="dash-pagination-controls">
+                            <!-- Botones generados dinámicamente -->
+                        </div>
+                    </div>                    
                 </div>
                 
             </section>
@@ -312,6 +319,13 @@
                             <tbody class="divide-y divide-gray-200" id="programacion-rows"></tbody>
                         </table>
                     </div>
+                    <!-- Paginación Programación -->
+                    <div class="px-5 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 bg-gray-50/50">
+                        <div id="prog-pagination-info">Mostrando 0 de 0 registros</div>
+                        <div class="flex items-center space-x-1" id="prog-pagination-controls">
+                            <!-- Botones generados dinámicamente -->
+                        </div>
+                    </div>                    
                 </div>
             </section>
 
@@ -722,6 +736,9 @@
         let activeOrden = null;
         let isEditing = false;
         let pestanaOrigen = 'programacion';
+        const ITEMS_PER_PAGE = 20; // Cambia a 15 o 20 si prefieres más filas por página
+        let currentDashPage = 1;
+        let currentProgPage = 1;
 
         window.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
@@ -836,15 +853,16 @@
 
         // --- FILTROS DASHBOARD (RECONECTADOS A LA FECHA DE LA PROGRAMACIÓN) ---
         function applyFiltersReal() {
+            currentDashPage = 1;
             const search = document.getElementById('filter-real-search') ? document.getElementById('filter-real-search').value.toLowerCase() : '';
             const status = document.getElementById('filter-real-status') ? document.getElementById('filter-real-status').value : '';
             const start = document.getElementById('filter-real-date-start') ? document.getElementById('filter-real-date-start').value : '';
             const end = document.getElementById('filter-real-date-end') ? document.getElementById('filter-real-date-end').value : '';
-
             renderDashboard(search, start, end, status);
         }
 
         function applyFiltersProg() {
+            currentProgPage = 1;
             const search = document.getElementById('filter-prog-search') ? document.getElementById('filter-prog-search').value.toLowerCase() : '';
             const status = document.getElementById('filter-prog-status') ? document.getElementById('filter-prog-status').value : '';
             const start = document.getElementById('filter-prog-date-start') ? document.getElementById('filter-prog-date-start').value : '';
@@ -853,84 +871,105 @@
             renderProgramacion(search, start, end, status);
         }
 
-        // --- RENDERIZADO PANEL DE CONTROL COMPACTO ---
+        // --- RENDERIZADO PANEL DE CONTROL COMPACTO ---        
         function renderDashboard(searchFilter, dateStart, dateEnd, statusFilter) {
-            // Si la función es llamada sin argumentos (ej. desde renderAll()), lee los valores visibles
+            // 1. Lectura de filtros activos o visibles
             const inputSearch = document.getElementById('filter-real-search');
             const inputStatus = document.getElementById('filter-real-status');
             const inputStart = document.getElementById('filter-real-date-start');
             const inputEnd = document.getElementById('filter-real-date-end');
-
+        
             const search = searchFilter !== undefined ? searchFilter : (inputSearch ? inputSearch.value.toLowerCase() : '');
             const status = statusFilter !== undefined ? statusFilter : (inputStatus ? inputStatus.value : '');
             const start = dateStart !== undefined ? dateStart : (inputStart ? inputStart.value : '');
             const end = dateEnd !== undefined ? dateEnd : (inputEnd ? inputEnd.value : '');
-
+        
             const rows = document.getElementById('produccion-real-rows');
             if (!rows) return;
             rows.innerHTML = '';
-
-            // Conteo de tarjetas superiores
+        
+            // 2. Conteo de tarjetas superiores (KPIs)
             document.getElementById('dash-programadas').innerText = rawDatabase.programacion ? rawDatabase.programacion.length : 0;
             document.getElementById('dash-realizadas').innerText = rawDatabase.produccionReal ? rawDatabase.produccionReal.filter(p => parseFloat(p.Insumo_Real || 0) > 0).length : 0;
             document.getElementById('dash-alertas').innerText = rawDatabase.produccionReal ? rawDatabase.produccionReal.filter(p => p.Estado_Rendimiento && p.Estado_Rendimiento.includes('Fuera')).length : 0;
-
+        
             if (!rawDatabase || !rawDatabase.produccionReal || rawDatabase.produccionReal.length === 0) {
                 rows.innerHTML = `<tr><td colspan="9" class="px-4 py-8 text-center text-gray-400">No hay registros de producción</td></tr>`;
+                renderPaginador('dash', 0, 1, 1);
                 return;
             }
-
+        
+            // 3. Filtrar sobre el 100% de los datos
             const filteredReal = rawDatabase.produccionReal.filter(p => {
                 const prog = rawDatabase.programacion ? rawDatabase.programacion.find(pg => pg.ID_Orden === p.ID_Orden) : null;
                 const prodNombre = getProductoPorOrden(p.ID_Orden).toLowerCase();
                 const ordId = (p.ID_Orden || '').toLowerCase();
-
+        
                 const matchesProduct = ordId.includes(search) || prodNombre.includes(search);
                 const matchesStatus = !status || (p.Estado_Rendimiento === status);
-
-                // Evaluación por rango de fechas contra la fecha de la orden en Programación
+        
                 let matchesRange = true;
                 if (prog && prog.Fecha) {
                     const progDate = new Date(prog.Fecha).toISOString().split('T')[0];
                     if (start && progDate < start) matchesRange = false;
                     if (end && progDate > end) matchesRange = false;
                 }
-
+        
                 return matchesProduct && matchesStatus && matchesRange;
             });
-
-            if (filteredReal.length === 0) {
+        
+            // 4. Ordenar descendente (los más recientes primero)
+            filteredReal.sort((a, b) => {
+                const timeA = a.Timestamp ? new Date(a.Timestamp).getTime() : 0;
+                const timeB = b.Timestamp ? new Date(b.Timestamp).getTime() : 0;
+                if (timeA !== timeB) return timeB - timeA;
+        
+                const progA = rawDatabase.programacion ? rawDatabase.programacion.find(pg => pg.ID_Orden === a.ID_Orden) : null;
+                const progB = rawDatabase.programacion ? rawDatabase.programacion.find(pg => pg.ID_Orden === b.ID_Orden) : null;
+                const dateA = progA && progA.Fecha ? new Date(progA.Fecha).getTime() : 0;
+                const dateB = progB && progB.Fecha ? new Date(progB.Fecha).getTime() : 0;
+                return dateB - dateA;
+            });
+        
+            const totalItems = filteredReal.length;
+            if (totalItems === 0) {
                 rows.innerHTML = `<tr><td colspan="9" class="px-4 py-8 text-center text-gray-400">Sin coincidencias para el criterio seleccionado</td></tr>`;
+                renderPaginador('dash', 0, 1, 1);
                 return;
             }
-
-            filteredReal.forEach(p => {
+        
+            // 5. Partición por páginas (Paginación)
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+            if (currentDashPage > totalPages) currentDashPage = totalPages;
+            if (currentDashPage < 1) currentDashPage = 1;
+        
+            const startIndex = (currentDashPage - 1) * ITEMS_PER_PAGE;
+            const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
+            const itemsPagina = filteredReal.slice(startIndex, endIndex);
+        
+            // 6. Renderizar solo los registros de la página activa
+            itemsPagina.forEach(p => {
                 const isAlerta = p.Estado_Rendimiento && p.Estado_Rendimiento.includes('Fuera');
                 const badgeColor = !isAlerta ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200';
                 
                 const isAdmin = activeUser && activeUser.rol === "Admin";
                 const actionLabel = isAdmin ? "Editar" : "Ver";
                 const icon = isAdmin ? "edit-3" : "eye";
-            
+        
                 const insReal = parseFloat(p.Insumo_Real) || 0;
-            
                 const unidadItem = (p.Unidad || '').trim().toLowerCase();
                 let masaBaseKg = 0;
-            
-                // Si la orden viene en Kg, la base es el insumo real.
-                // Si viene en unidades (und, pza, etc.), la base es el pesaje registrado en Peso_Total_Kg.
+        
                 if (unidadItem === 'kg' || unidadItem === 'kilos') {
                     masaBaseKg = insReal;
                 } else {
                     masaBaseKg = parseFloat(p.Peso_Total_Kg || p.PESO_TOTAL_KG || p.peso_total_kg) || 0;
                 }
-            
+        
                 let pctBasura = 0;
                 let pctTransf = 0;
-            
+        
                 const mermasOrden = rawDatabase.mermas ? rawDatabase.mermas.filter(m => m.ID_Orden === p.ID_Orden) : [];
-                
-                // Calculamos los porcentajes de merma usando masaBaseKg
                 if (masaBaseKg > 0) {
                     let totalBasura = 0;
                     let totalTransf = 0;
@@ -941,14 +980,13 @@
                     pctBasura = (totalBasura / masaBaseKg) * 100;
                     pctTransf = (totalTransf / masaBaseKg) * 100;
                 }
-            
-                // Cálculo de Reducción (usando masaBaseKg para mantener congruencia en kilos)
+        
                 const insRed = parseFloat(p.Insumo_Reducido) || 0;
                 let pctReduccion = 0;
                 if (masaBaseKg > 0 && insRed > 0 && insRed < masaBaseKg) {
                     pctReduccion = ((masaBaseKg - insRed) / masaBaseKg) * 100;
                 }
-            
+        
                 rows.innerHTML += `
                     <tr class="hover:bg-slate-50/80 transition-colors">
                         <td class="px-3 py-2.5 font-bold text-indigo-600 whitespace-nowrap">${p.ID_Orden}</td>
@@ -972,7 +1010,9 @@
                     </tr>
                 `;
             });
-            
+        
+            // 7. Actualizar la barra inferior de paginación
+            renderPaginador('dash', totalItems, currentDashPage, totalPages, startIndex + 1, endIndex);
             lucide.createIcons();
         }
 
@@ -992,6 +1032,9 @@
             if (!rows) return;
             rows.innerHTML = '';
 
+            if (!rawDatabase || !rawDatabase.programacion) return;
+
+            // 1. Filtrar sobre el 100% de las órdenes programadas
             const filteredProg = rawDatabase.programacion.filter(p => {
                 const prodName = (p.Producto || '').toLowerCase();
                 const ordId = (p.ID_Orden || '').toLowerCase();
@@ -1001,7 +1044,7 @@
                 let estadoOrden = (p.Estado_Registro || '').trim();
                 if (!estadoOrden) estadoOrden = 'Pendiente';
 
-                // Validación de filtro de estado (tolerante a mayúsculas/minúsculas)
+                // Validación de filtro de estado
                 let matchesStatus = true;
                 if (status) {
                     matchesStatus = estadoOrden.toLowerCase() === status.toLowerCase();
@@ -1018,12 +1061,31 @@
                 return matchesProduct && matchesStatus && matchesRange;
             });
 
-            if (filteredProg.length === 0) {
+            // 2. Ordenar de manera descendente (los más recientes primero)
+            filteredProg.sort((a, b) => {
+                const dateA = a.Fecha ? new Date(a.Fecha).getTime() : 0;
+                const dateB = b.Fecha ? new Date(b.Fecha).getTime() : 0;
+                return dateB - dateA;
+            });
+
+            const totalItems = filteredProg.length;
+            if (totalItems === 0) {
                 rows.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400">Sin programación para este criterio</td></tr>`;
+                renderPaginador('prog', 0, 1, 1);
                 return;
             }
 
-            filteredProg.forEach(p => {
+            // 3. Segmentación para paginación (Slicing)
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+            if (currentProgPage > totalPages) currentProgPage = totalPages;
+            if (currentProgPage < 1) currentProgPage = 1;
+
+            const startIndex = (currentProgPage - 1) * ITEMS_PER_PAGE;
+            const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
+            const itemsPagina = filteredProg.slice(startIndex, endIndex);
+
+            // 4. Renderizar únicamente las filas correspondientes a la página activa
+            itemsPagina.forEach(p => {
                 let badgeStyle = 'bg-gray-100 text-gray-700';
                 let btnHTML = '';
                 const isAdmin = activeUser && activeUser.rol === "Admin";
@@ -1066,7 +1128,70 @@
                     </tr>
                 `;
             });
+
+            // 5. Dibujar los controles de paginación inferiores
+            renderPaginador('prog', totalItems, currentProgPage, totalPages, startIndex + 1, endIndex);
             lucide.createIcons();
+        }
+
+        // --- 3. MOTOR REUTILIZABLE DE PAGINACIÓN ---
+        function renderPaginador(tipo, total, actual, totalPaginas, inicio = 0, fin = 0) {
+            const infoEl = document.getElementById(`${tipo}-pagination-info`);
+            const controlsEl = document.getElementById(`${tipo}-pagination-controls`);
+            if (!infoEl || !controlsEl) return;
+
+            if (total === 0) {
+                infoEl.innerText = "Mostrando 0 registros";
+                controlsEl.innerHTML = "";
+                return;
+            }
+
+            infoEl.innerHTML = `Mostrando <span class="font-bold text-slate-700">${inicio}-${fin}</span> de <span class="font-bold text-slate-700">${total}</span> registros`;
+
+            if (totalPaginas <= 1) {
+                controlsEl.innerHTML = "";
+                return;
+            }
+
+            let html = `
+                <button onclick="cambiarPagina('${tipo}', ${actual - 1})" ${actual === 1 ? 'disabled class="opacity-40 cursor-not-allowed"' : 'class="hover:bg-gray-200"'} class="px-2.5 py-1 rounded border border-gray-300 font-semibold text-slate-600">
+                    &lt; Ant
+                </button>
+            `;
+
+            for (let i = 1; i <= totalPaginas; i++) {
+                // Si hay muchas páginas, muestra solo las cercanas a la actual
+                if (i === 1 || i === totalPaginas || (i >= actual - 1 && i <= actual + 1)) {
+                    const activeClass = i === actual 
+                        ? 'bg-indigo-600 text-white border-indigo-600 font-bold' 
+                        : 'border-gray-300 text-slate-600 hover:bg-gray-100';
+                    html += `
+                        <button onclick="cambiarPagina('${tipo}', ${i})" class="px-2.5 py-1 rounded border ${activeClass}">
+                            ${i}
+                        </button>
+                    `;
+                } else if (i === actual - 2 || i === actual + 2) {
+                    html += `<span class="px-1 text-gray-400">...</span>`;
+                }
+            }
+
+            html += `
+                <button onclick="cambiarPagina('${tipo}', ${actual + 1})" ${actual === totalPaginas ? 'disabled class="opacity-40 cursor-not-allowed"' : 'class="hover:bg-gray-200"'} class="px-2.5 py-1 rounded border border-gray-300 font-semibold text-slate-600">
+                    Sig &gt;
+                </button>
+            `;
+
+            controlsEl.innerHTML = html;
+        }
+
+        function cambiarPagina(tipo, nuevaPagina) {
+            if (tipo === 'dash') {
+                currentDashPage = nuevaPagina;
+                applyFiltersReal();
+            } else if (tipo === 'prog') {
+                currentProgPage = nuevaPagina;
+                applyFiltersProg();
+            }
         }
 
         function renderHistorico() {
