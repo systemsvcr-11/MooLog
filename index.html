@@ -1463,13 +1463,19 @@
                 showToast("Debes ingresar obligatoriamente el Insumo Real Recibido.", "error");
                 return;
             }
-
+            
+            // AHORA (solo exige peso si hay mermas o reducción que requieran calcular % sobre masa):
             const unidadOrden = (activeOrden.Unidad || '').trim().toLowerCase();
             const esPorUnidades = unidadOrden !== 'kg' && unidadOrden !== 'kilos';
-            if (esPorUnidades && pesoTotalKg <= 0) {
-                showToast("Para insumos en unidades, ingresa el Peso Total de Entrada en Kg.", "error");
+            
+            // Se comprueba si el usuario agregó filas de mermas con cantidad > 0
+            const tieneMermasActivas = !tieneMermasBloqueadas && document.querySelectorAll('.merma-row-item').length > 0;
+            const tieneReduccion = insRed > 0;
+            
+            if (esPorUnidades && (tieneMermasActivas || tieneReduccion) && pesoTotalKg <= 0) {
+                showToast("Para calcular mermas o reducción en insumos por unidades, ingresa el Peso Total de Entrada en Kg.", "error");
                 return;
-            }
+            }           
 
             const mermas = [];
             let errorMermas = false;
