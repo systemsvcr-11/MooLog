@@ -1187,10 +1187,10 @@
         function cambiarPagina(tipo, nuevaPagina) {
             if (tipo === 'dash') {
                 currentDashPage = nuevaPagina;
-                applyFiltersReal();
+                renderDashboard();
             } else if (tipo === 'prog') {
                 currentProgPage = nuevaPagina;
-                applyFiltersProg();
+                renderProgramacion();
             }
         }
 
