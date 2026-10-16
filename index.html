@@ -1415,7 +1415,7 @@
                 const min = Math.floor(totalInsumoAProcesar * limites.Rendimiento_Inferior);
                 const max = Math.ceil(totalInsumoAProcesar * limites.Rendimiento_Superior);
                 
-                let textoEstimacion = `Debieron salir: ${min} a ${max} unid.`;
+                let textoEstimacion = `Debieron salir: ${min} a ${max} UDS`;
                 if (transRecibida > 0) {
                     textoEstimacion += `<br><span class="text-[10px] text-indigo-600 font-semibold block mt-1">Incluye +${transRecibida} ${activeOrden.Unidad} transferidos de ${origenTrans}</span>`;
                 }
