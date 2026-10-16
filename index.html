@@ -1424,13 +1424,13 @@
                 estimacion.innerText = "Debieron salir: 0 unid.";
             }
 
-            if (real <= 0 || logrados <= 0) {
-                liveEstado.innerText = "Esperando Datos";
-                liveEstado.className = "px-4 py-2.5 rounded-full bg-slate-100 text-slate-500 text-base font-bold inline-block";
-                background.className = "absolute inset-x-0 top-0 h-2 bg-slate-300";
-                alertWarning.classList.add('hidden');
-                return;
-            }
+            if (totalInsumoAProcesar <= 0 || logrados <= 0) {
+            liveEstado.innerText = "Esperando Datos";
+            liveEstado.className = "px-4 py-2.5 rounded-full bg-slate-100 text-slate-500 text-base font-bold inline-block";
+            background.className = "absolute inset-x-0 top-0 h-2 bg-slate-300";
+            alertWarning.classList.add('hidden');
+            return;
+        }
 
             const actualRend = logrados / totalInsumoAProcesar;
 
@@ -1584,11 +1584,13 @@
             const pesoTotalKg = parseFloat(document.getElementById('insumo-peso-kg').value) || 0;
             const empLogrados = parseFloat(document.getElementById('empacados-logrados').value) || 0;
 
-            if (insReal <= 0) {
-                showToast("Debes ingresar obligatoriamente el Insumo Real Recibido.", "error");
+            const transRecibida = parseFloat(document.getElementById('live-estado').dataset.transRecibida) || 0;
+            const totalInsumoDisponible = insReal + transRecibida;
+
+            if (totalInsumoDisponible <= 0) {
+                showToast("Debes ingresar el Insumo Real Recibido o contar con una transferencia cargada.", "error");
                 return;
             }
-            
             // AHORA (solo exige peso si hay mermas o reducción que requieran calcular % sobre masa):
             const unidadOrden = (activeOrden.Unidad || '').trim().toLowerCase();
             const esPorUnidades = unidadOrden !== 'kg' && unidadOrden !== 'kilos';
