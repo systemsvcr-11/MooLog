@@ -768,7 +768,7 @@
       let productoSeleccionadoIns = "";
 
         // ================= INICIALIZACIÓN Y SSO SEGURO =================
-        window.addEventListener('DOMContentLoaded', async () => {
+          window.addEventListener('DOMContentLoaded', async () => {
           if (window.lucide) lucide.createIcons();
         
           const dateSpan = document.getElementById('current-date');
@@ -776,11 +776,39 @@
             dateSpan.innerText = `Fecha: ${new Date().toLocaleDateString()}`;
           }
         
-          // 1. OBTENER CREDENCIALES DEL LAUNCHER
-          const tempUser = sessionStorage.getItem("sso_temp_user");
-          const tempPass = sessionStorage.getItem("sso_temp_pass");
+          // 1. REVISAR SI VIENE TOKEN SSO EN EL HASH DE LA URL (#sso=...)
+          let ssoUser = null;
+          let ssoPass = null;
+          const hash = window.location.hash;
         
-          // Leer sesión previa guardada localmente
+          if (hash && hash.includes('sso=')) {
+            try {
+              const rawToken = hash.split('sso=')[1].split('&')[0];
+              const decodedJson = decodeURIComponent(escape(atob(rawToken)));
+              const parsed = JSON.parse(decodedJson);
+        
+              // Verificar que el token no tenga más de 60 segundos de emitido
+              if (Date.now() - parsed.t < 60000) {
+                ssoUser = parsed.u;
+                ssoPass = parsed.p;
+              }
+            } catch (e) {
+              console.warn("Token SSO inválido o corrupto:", e);
+            }
+        
+            // LIMPIAR LA URL INMEDIATAMENTE para que no queden credenciales visibles en el historial
+            history.replaceState(null, document.title, window.location.pathname + window.location.search);
+          }
+        
+          // Fallback a sessionStorage si estuviesen en el mismo origen exacto
+          if (!ssoUser) {
+            ssoUser = sessionStorage.getItem("sso_temp_user");
+            ssoPass = sessionStorage.getItem("sso_temp_pass");
+            sessionStorage.removeItem("sso_temp_user");
+            sessionStorage.removeItem("sso_temp_pass");
+          }
+        
+          // 2. LEER SESIÓN PREVIA GUARDADA LOCALMENTE
           let savedSession = null;
           try {
             const raw = localStorage.getItem('packflow_session');
@@ -789,20 +817,17 @@
             localStorage.removeItem('packflow_session');
           }
         
-          // CASO A: Vienen credenciales desde el Launcher
-          if (tempUser && tempPass) {
-            sessionStorage.removeItem("sso_temp_user");
-            sessionStorage.removeItem("sso_temp_pass");
-        
-            // Si la sesión guardada NO pertenece al usuario que viene del Launcher, BORRARLA
-            if (savedSession && savedSession.user?.toLowerCase() !== tempUser.toLowerCase()) {
+          // CASO 1: Viene una solicitud SSO desde el Portal
+          if (ssoUser && ssoPass) {
+            // Si la sesión que estaba guardada pertenece a OTRA cuenta distinta, se destruye
+            if (savedSession && savedSession.user?.toLowerCase() !== ssoUser.toLowerCase()) {
               localStorage.removeItem('packflow_session');
               savedSession = null;
               activeUser = null;
             }
         
-            // Si ya coincide la sesión guardada con el usuario, entrar directo
-            if (savedSession && savedSession.user?.toLowerCase() === tempUser.toLowerCase()) {
+            // Si coincide con la sesión ya autenticada, ingresar de inmediato sin recargar
+            if (savedSession && savedSession.user?.toLowerCase() === ssoUser.toLowerCase()) {
               activeUser = savedSession;
               mostrarPantallaLogin(false);
               aplicarPermisosRol();
@@ -810,20 +835,19 @@
               return;
             }
         
-            // Si es un usuario nuevo o diferente, autenticar con Sheets
+            // Si es un usuario nuevo o diferente, autenticar automáticamente contra Apps Script
             mostrarPantallaLogin(false);
             const userInput = document.getElementById('login-user');
             const passInput = document.getElementById('login-pass');
-        
             if (userInput && passInput) {
-              userInput.value = tempUser;
-              passInput.value = tempPass;
-              await intentarLogin();
-              return;
+              userInput.value = ssoUser;
+              passInput.value = ssoPass;
             }
+            await intentarLogin();
+            return;
           }
         
-          // CASO B: Entrada directa (sin Launcher) pero con sesión válida
+          // CASO 2: Entrada directa sin SSO pero con sesión activa guardada
           if (savedSession) {
             activeUser = savedSession;
             mostrarPantallaLogin(false);
@@ -832,10 +856,10 @@
             return;
           }
         
-          // CASO C: Sin sesión ni credenciales -> Pedir login manual
+          // CASO 3: Sin sesión y sin SSO -> Mostrar pantalla de login manual
           mostrarPantallaLogin(true);
         });
-
+    
         
             
       function mostrarPantallaLogin(visible) {
@@ -896,14 +920,16 @@
         }
       }
     
+      function volverAlMenu() {
+        // Coloca aquí el enlace real de tu Portal Corporativo
+        window.location.href = "https://funny-muffin-67cb71.netlify.app/"; 
+      }
+
       function cerrarSesion() {
         localStorage.removeItem('packflow_session');
         activeUser = null;
-        mostrarPantallaLogin(true);
-        const u = document.getElementById('login-user');
-        const p = document.getElementById('login-pass');
-        if (u) u.value = '';
-        if (p) p.value = '';
+        // Redirige al portal para limpiar el ciclo
+        window.location.href = "https://funny-muffin-67cb71.netlify.app/";
       }
     
       function aplicarPermisosRol() {
