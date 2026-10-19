@@ -766,8 +766,8 @@
       let tieneMermasBloqueadas = false;
       let productoSeleccionadoCalc = "";
       let productoSeleccionadoIns = "";
-    
-      // ================= INICIALIZACIÓN Y SSO SEGURO =================
+
+        // ================= INICIALIZACIÓN Y SSO SEGURO =================
         window.addEventListener('DOMContentLoaded', async () => {
           if (window.lucide) lucide.createIcons();
         
@@ -776,49 +776,63 @@
             dateSpan.innerText = `Fecha: ${new Date().toLocaleDateString()}`;
           }
         
-          // 1. REVISAR SI VIENEN CREDENCIALES NUEVAS DESDE EL LAUNCHER (MÁXIMA PRIORIDAD)
+          // 1. OBTENER CREDENCIALES DEL LAUNCHER
           const tempUser = sessionStorage.getItem("sso_temp_user");
           const tempPass = sessionStorage.getItem("sso_temp_pass");
         
+          // Leer sesión previa guardada localmente
+          let savedSession = null;
+          try {
+            const raw = localStorage.getItem('packflow_session');
+            if (raw) savedSession = JSON.parse(raw);
+          } catch (e) {
+            localStorage.removeItem('packflow_session');
+          }
+        
+          // CASO A: Vienen credenciales desde el Launcher
           if (tempUser && tempPass) {
-            // Borrar de inmediato para no dejar rastro
             sessionStorage.removeItem("sso_temp_user");
             sessionStorage.removeItem("sso_temp_pass");
         
-            // Limpiar sesión local previa para no arrastrar la cuenta anterior
-            localStorage.removeItem('packflow_session');
-            activeUser = null;
+            // Si la sesión guardada NO pertenece al usuario que viene del Launcher, BORRARLA
+            if (savedSession && savedSession.user?.toLowerCase() !== tempUser.toLowerCase()) {
+              localStorage.removeItem('packflow_session');
+              savedSession = null;
+              activeUser = null;
+            }
         
-            // Mantener oculto el login mientras consulta el servidor para evitar parpadeos
+            // Si ya coincide la sesión guardada con el usuario, entrar directo
+            if (savedSession && savedSession.user?.toLowerCase() === tempUser.toLowerCase()) {
+              activeUser = savedSession;
+              mostrarPantallaLogin(false);
+              aplicarPermisosRol();
+              await cargarDatosDeSheets();
+              return;
+            }
+        
+            // Si es un usuario nuevo o diferente, autenticar con Sheets
             mostrarPantallaLogin(false);
-        
             const userInput = document.getElementById('login-user');
             const passInput = document.getElementById('login-pass');
         
             if (userInput && passInput) {
               userInput.value = tempUser;
               passInput.value = tempPass;
-              // Autenticar contra Google Sheets
               await intentarLogin();
               return;
             }
           }
         
-          // 2. SOLO SI NO VIENE DEL LAUNCHER: verificar si hay sesión previa guardada
-          const savedSession = localStorage.getItem('packflow_session');
+          // CASO B: Entrada directa (sin Launcher) pero con sesión válida
           if (savedSession) {
-            try {
-              activeUser = JSON.parse(savedSession);
-              mostrarPantallaLogin(false);
-              aplicarPermisosRol();
-              await cargarDatosDeSheets();
-              return;
-            } catch (e) {
-              localStorage.removeItem('packflow_session');
-            }
+            activeUser = savedSession;
+            mostrarPantallaLogin(false);
+            aplicarPermisosRol();
+            await cargarDatosDeSheets();
+            return;
           }
         
-          // 3. Si no hay credenciales ni sesión previa, mostrar login manual
+          // CASO C: Sin sesión ni credenciales -> Pedir login manual
           mostrarPantallaLogin(true);
         });
 
