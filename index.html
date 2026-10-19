@@ -742,154 +742,137 @@
 
         </div>
     </main>
-    <!-- Supabase JS SDK (si no lo pusiste en el <head>, déjalo aquí) -->
+    <!-- Supabase JS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+    
     <script>
       // ================= CONFIGURACIÓN SUPABASE =================
       const SUPABASE_URL = "https://hhxoxnhjolfmywywimlp.supabase.co";
       const SUPABASE_ANON_KEY = "sb_publishable_XxAR4ue0cFwr8p1pfh9T-w_nuPMbbi3";
       const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      // ================= 1. RECEPTOR SSO Y VERIFICACIÓN INICIAL =================
+    
+      // ================= 1. VERIFICACIÓN INICIAL (SSO DESDE EL HUB) =================
       async function inicializarAutenticacion() {
-          const loginScreen = document.getElementById("login-screen");
-          
-          // 1. Verificar si viene lanzado desde el Launcher con tokens en el hash (#)
-          const hash = window.location.hash.substring(1);
-          const params = new URLSearchParams(hash);
-          const accessToken = params.get("sso_access_token");
-          const refreshToken = params.get("sso_refresh_token");
-        
-          if (accessToken && refreshToken) {
-            // Inyectar tokens de sesión en el cliente local
-            const { data, error } = await supabaseClient.auth.setSession({
-              access_token: decodeURIComponent(accessToken),
-              refresh_token: decodeURIComponent(refreshToken)
-            });
-        
-            // Limpiar la URL de inmediato para ocultar los tokens del historial
-            history.replaceState(null, "", window.location.pathname + window.location.search);
-        
-            if (!error && data?.session) {
-              // Pasa el usuario a la función que valida si tiene permiso para este módulo
-              autenticarUsuarioEnUI(data.session.user);
-              return;
-            }
+        const loginScreen = document.getElementById("login-screen");
+    
+        // Revisar si viene lanzado desde el Hub con tokens en la URL (#)
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const accessToken = params.get("sso_access_token");
+        const refreshToken = params.get("sso_refresh_token");
+    
+        if (accessToken && refreshToken) {
+          const { data, error } = await supabaseClient.auth.setSession({
+            access_token: decodeURIComponent(accessToken),
+            refresh_token: decodeURIComponent(refreshToken)
+          });
+    
+          // Limpiar URL
+          history.replaceState(null, "", window.location.pathname + window.location.search);
+    
+          if (!error && data?.session) {
+            darAcceso(data.session.user);
+            return;
           }
-        
-          // 2. Si no venía por URL, verificar si ya existía una sesión guardada previamente
-          const { data: { session } } = await supabaseClient.auth.getSession();
-          if (session) {
-            autenticarUsuarioEnUI(session.user);
-          } else {
-            // 3. Si entró directamente y no tiene sesión: dejamos visible el login
-            loginScreen.classList.remove("hidden");
-            lucide.createIcons();
-          }
-       }
-        
-      // ================= 2. ENTRADA EXITOSA A LA APP =================
-      const MODULO_ID = "Moolog";.
-      const URL_LAUNCHER = "https://playful-clafoutis-d0aca2.netlify.app/";
-
-        // ================= FUNCIÓN PARA VOLVER AL MENÚ =================
-        function volverAlMenu() {
-            if (window.history.length > 1) {
-                window.history.back(); // Regresa directo a la pestaña anterior del Hub
-            } else {
-                window.location.href = URL_LAUNCHER; // Si no hay historial, redirige a la URL fija
-            }
         }
-      // ================= VERIFICACIÓN DE AUTORIZACIÓN =================
-        function autenticarUsuarioEnUI(user) {
-            const loginScreen = document.getElementById("login-screen");
-            const deniedScreen = document.getElementById("denied-screen");
-        
-            // 1. Extraer módulos permitidos de la metadata
-            const modulosPermitidos = user.user_metadata?.modulos || [];
-        
-            // 2. Coloca aquí tu correo exacto como Administrador Supremo (acceso total garantizado)
-            const emailsSuperAdmin = [
-                user.email // Mientras estás en desarrollo o pon tu correo: "tu-correo@gmail.com"
-            ];
-        
-            const tienePermiso = modulosPermitidos.includes(MODULO_ID) || emailsSuperAdmin.includes(user.email);
-        
-            if (!tienePermiso) {
-                loginScreen.classList.add("hidden");
-                document.getElementById("denied-user-email").textContent = user.email;
-                deniedScreen.classList.remove("hidden");
-                lucide.createIcons();
-                return;
-            }
-        
-            // Acceso permitido
-            loginScreen.classList.add("hidden");
-            deniedScreen.classList.add("hidden");
-        
-            // Datos de usuario en sidebar
-            const userDisplayName = document.getElementById("user-display-name");
-            const userAvatar = document.getElementById("user-avatar");
-            const userDisplayRole = document.getElementById("user-display-role");
-        
-            if (userDisplayName) userDisplayName.textContent = user.email.split("@")[0];
-            if (userAvatar) userAvatar.textContent = user.email.charAt(0).toUpperCase();
-            if (userDisplayRole) userDisplayRole.textContent = "Autorizado";
-        
-            const dateSpan = document.getElementById("current-date");
-            if (dateSpan) {
-                const hoy = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
-                dateSpan.textContent = `Fecha: ${hoy}`;
-            }
-        
-            lucide.createIcons();
+    
+        // Revisar si ya tenía sesión activa en este navegador
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+          darAcceso(session.user);
+        } else {
+          // Si no hay sesión válida, mantener pantalla de login activa
+          loginScreen.classList.remove("hidden");
+          lucide.createIcons();
         }
-
-      // ================= 3. LOGIN MANUAL (POR SI ABRE LA APP SOLA) =================
+      }
+    
+      // ================= 2. ENTRADA A LA APLICACIÓN =================
+      function darAcceso(user) {
+        const loginScreen = document.getElementById("login-screen");
+        loginScreen.classList.add("hidden");
+    
+        // Datos en la barra lateral
+        const userDisplayName = document.getElementById("user-display-name");
+        const userAvatar = document.getElementById("user-avatar");
+        const userDisplayRole = document.getElementById("user-display-role");
+    
+        if (userDisplayName) userDisplayName.textContent = user.email.split("@")[0];
+        if (userAvatar) userAvatar.textContent = user.email.charAt(0).toUpperCase();
+        if (userDisplayRole) userDisplayRole.textContent = "Conectado";
+    
+        const dateSpan = document.getElementById("current-date");
+        if (dateSpan) {
+          const hoy = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+          dateSpan.textContent = `Fecha: ${hoy}`;
+        }
+    
+        lucide.createIcons();
+      }
+    
+      // ================= 3. INICIO DE SESIÓN MANUAL =================
       async function intentarLogin() {
         const emailInput = document.getElementById("login-user");
         const passInput = document.getElementById("login-pass");
         const btnLogin = document.getElementById("btn-login");
-
+        const errorMsg = document.getElementById("login-error-msg");
+    
+        // Limpiar mensaje de error anterior
+        if (errorMsg) errorMsg.classList.add("hidden");
+    
         const email = emailInput.value.trim();
         const password = passInput.value;
-
+    
         if (!email || !password) {
-          alert("Por favor completa tu correo y contraseña.");
+          mostrarError("Ingresa tu correo y contraseña.");
           return;
         }
-
+    
         btnLogin.disabled = true;
         btnLogin.innerHTML = `<span>Verificando...</span>`;
-
+    
         const { data, error } = await supabaseClient.auth.signInWithPassword({
           email: email,
           password: password
         });
-
-        if (error) {
-          alert("Error de autenticación: " + (error.message || "Credenciales incorrectas"));
-          btnLogin.disabled = false;
-          btnLogin.innerHTML = `<span>Iniciar Sesión</span>`;
-          return;
-        }
-
+    
         btnLogin.disabled = false;
         btnLogin.innerHTML = `<span>Iniciar Sesión</span>`;
-        autenticarUsuarioEnUI(data.session.user);
+    
+        if (error) {
+          // Mensaje cuando las credenciales no son iguales / incorrectas
+          mostrarError("Las credenciales no coinciden o son incorrectas.");
+          return;
+        }
+    
+        // Si coincide: entra directo
+        darAcceso(data.session.user);
       }
-
+    
+      function mostrarError(texto) {
+        let errorMsg = document.getElementById("login-error-msg");
+        if (!errorMsg) {
+          // Si no existe el contenedor de texto de error, crearlo dinámicamente arriba del botón
+          const btnLogin = document.getElementById("btn-login");
+          errorMsg = document.createElement("p");
+          errorMsg.id = "login-error-msg";
+          errorMsg.className = "text-rose-500 text-xs font-semibold text-center";
+          btnLogin.parentNode.insertBefore(errorMsg, btnLogin);
+        }
+        errorMsg.textContent = texto;
+        errorMsg.classList.remove("hidden");
+      }
+    
       // ================= 4. CERRAR SESIÓN =================
       async function cerrarSesion() {
-            await supabaseClient.auth.signOut();
-            document.getElementById("denied-screen").classList.add("hidden");
-            document.getElementById("login-screen").classList.remove("hidden");
-            document.getElementById("login-pass").value = "";
-            lucide.createIcons();
+        await supabaseClient.auth.signOut();
+        document.getElementById("login-screen").classList.remove("hidden");
+        document.getElementById("login-pass").value = "";
+        const errorMsg = document.getElementById("login-error-msg");
+        if (errorMsg) errorMsg.classList.add("hidden");
+        lucide.createIcons();
       }
-
-      // Ejecutar la comprobación tan pronto carga el DOM
+    
       window.addEventListener("DOMContentLoaded", inicializarAutenticacion);
     </script>
 
