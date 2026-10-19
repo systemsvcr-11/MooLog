@@ -768,9 +768,9 @@
       let productoSeleccionadoIns = "";
     
       // ================= INICIALIZACIÓN Y SSO SEGURO =================
-          window.addEventListener('DOMContentLoaded', async () => {
+        window.addEventListener('DOMContentLoaded', async () => {
           if (window.lucide) lucide.createIcons();
-          
+        
           const dateSpan = document.getElementById('current-date');
           if (dateSpan) {
             dateSpan.innerText = `Fecha: ${new Date().toLocaleDateString()}`;
@@ -781,13 +781,16 @@
           const tempPass = sessionStorage.getItem("sso_temp_pass");
         
           if (tempUser && tempPass) {
-            // Borrar de inmediato de sessionStorage para no dejar rastro
+            // Borrar de inmediato para no dejar rastro
             sessionStorage.removeItem("sso_temp_user");
             sessionStorage.removeItem("sso_temp_pass");
         
-            // Limpiar sesión local guardada anteriormente para evitar usar la cuenta previa
+            // Limpiar sesión local previa para no arrastrar la cuenta anterior
             localStorage.removeItem('packflow_session');
             activeUser = null;
+        
+            // Mantener oculto el login mientras consulta el servidor para evitar parpadeos
+            mostrarPantallaLogin(false);
         
             const userInput = document.getElementById('login-user');
             const passInput = document.getElementById('login-pass');
@@ -795,7 +798,7 @@
             if (userInput && passInput) {
               userInput.value = tempUser;
               passInput.value = tempPass;
-              // Autenticar la nueva cuenta contra Google Sheets
+              // Autenticar contra Google Sheets
               await intentarLogin();
               return;
             }
@@ -815,7 +818,7 @@
             }
           }
         
-          // 3. Si no hay nada, mostrar login manual
+          // 3. Si no hay credenciales ni sesión previa, mostrar login manual
           mostrarPantallaLogin(true);
         });
 
