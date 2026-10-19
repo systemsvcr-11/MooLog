@@ -790,22 +790,33 @@
        }
         
       // ================= 2. ENTRADA EXITOSA A LA APP =================
-      const MODULO_ID = "Moolog";
-      function autenticarUsuarioEnUI(user) {
+      const MODULO_ID = "Moolog";.
+      const URL_LAUNCHER = "https://playful-clafoutis-d0aca2.netlify.app/";
+
+        // ================= FUNCIÓN PARA VOLVER AL MENÚ =================
+        function volverAlMenu() {
+            if (window.history.length > 1) {
+                window.history.back(); // Regresa directo a la pestaña anterior del Hub
+            } else {
+                window.location.href = URL_LAUNCHER; // Si no hay historial, redirige a la URL fija
+            }
+        }
+      // ================= VERIFICACIÓN DE AUTORIZACIÓN =================
+        function autenticarUsuarioEnUI(user) {
             const loginScreen = document.getElementById("login-screen");
             const deniedScreen = document.getElementById("denied-screen");
         
-            // 1. Obtener la lista de módulos permitidos desde user_metadata o app_metadata
-            // Si no definiste el array 'modulos', puedes usar una lista blanca de emails permitidos como respaldo
+            // 1. Extraer módulos permitidos de la metadata
             const modulosPermitidos = user.user_metadata?.modulos || [];
-            
-            // Lista de correos autorizados de emergencia (opcional)
-            const emailsAutorizados = ["tu-correo-admin@gmail.com"];
         
-            const tienePermiso = modulosPermitidos.includes(MODULO_ID) || emailsAutorizados.includes(user.email);
+            // 2. Coloca aquí tu correo exacto como Administrador Supremo (acceso total garantizado)
+            const emailsSuperAdmin = [
+                user.email // Mientras estás en desarrollo o pon tu correo: "tu-correo@gmail.com"
+            ];
+        
+            const tienePermiso = modulosPermitidos.includes(MODULO_ID) || emailsSuperAdmin.includes(user.email);
         
             if (!tienePermiso) {
-                // Bloquear acceso: ocultar login y mostrar pantalla de bloqueo
                 loginScreen.classList.add("hidden");
                 document.getElementById("denied-user-email").textContent = user.email;
                 deniedScreen.classList.remove("hidden");
@@ -813,11 +824,11 @@
                 return;
             }
         
-            // Si tiene permiso: dar acceso a la app
+            // Acceso permitido
             loginScreen.classList.add("hidden");
             deniedScreen.classList.add("hidden");
         
-            // Pintar los datos del usuario en la barra lateral
+            // Datos de usuario en sidebar
             const userDisplayName = document.getElementById("user-display-name");
             const userAvatar = document.getElementById("user-avatar");
             const userDisplayRole = document.getElementById("user-display-role");
