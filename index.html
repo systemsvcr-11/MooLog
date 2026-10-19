@@ -768,7 +768,7 @@
       let productoSeleccionadoIns = "";
     
       // ================= INICIALIZACIÓN Y SSO SEGURO =================
-        window.addEventListener('DOMContentLoaded', async () => {
+          window.addEventListener('DOMContentLoaded', async () => {
           if (window.lucide) lucide.createIcons();
           
           const dateSpan = document.getElementById('current-date');
@@ -776,14 +776,18 @@
             dateSpan.innerText = `Fecha: ${new Date().toLocaleDateString()}`;
           }
         
-          // 1. Revisar si vienen credenciales temporales desde el Launcher (misma pestaña)
+          // 1. REVISAR SI VIENEN CREDENCIALES NUEVAS DESDE EL LAUNCHER (MÁXIMA PRIORIDAD)
           const tempUser = sessionStorage.getItem("sso_temp_user");
           const tempPass = sessionStorage.getItem("sso_temp_pass");
         
           if (tempUser && tempPass) {
-            // Borrar de inmediato para no dejar rastro en el navegador
+            // Borrar de inmediato de sessionStorage para no dejar rastro
             sessionStorage.removeItem("sso_temp_user");
             sessionStorage.removeItem("sso_temp_pass");
+        
+            // Limpiar sesión local guardada anteriormente para evitar usar la cuenta previa
+            localStorage.removeItem('packflow_session');
+            activeUser = null;
         
             const userInput = document.getElementById('login-user');
             const passInput = document.getElementById('login-pass');
@@ -791,13 +795,13 @@
             if (userInput && passInput) {
               userInput.value = tempUser;
               passInput.value = tempPass;
-              // Ejecutar auto-login
+              // Autenticar la nueva cuenta contra Google Sheets
               await intentarLogin();
               return;
             }
           }
         
-          // 2. Si no venía de un redireccionamiento, revisar sesión guardada localmente
+          // 2. SOLO SI NO VIENE DEL LAUNCHER: verificar si hay sesión previa guardada
           const savedSession = localStorage.getItem('packflow_session');
           if (savedSession) {
             try {
@@ -811,9 +815,11 @@
             }
           }
         
-          // 3. Fallback: mostrar login manual
+          // 3. Si no hay nada, mostrar login manual
           mostrarPantallaLogin(true);
         });
+
+        
             
       function mostrarPantallaLogin(visible) {
         const screen = document.getElementById('login-screen');
