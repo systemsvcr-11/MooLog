@@ -750,41 +750,56 @@
       const SUPABASE_URL = "https://hhxoxnhjolfmywywimlp.supabase.co";
       const SUPABASE_ANON_KEY = "sb_publishable_XxAR4ue0cFwr8p1pfh9T-w_nuPMbbi3";
       const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    
-      // ================= 1. VERIFICACIÓN INICIAL (SSO DESDE EL HUB) =================
+        
+      // ================= 1. VERIFICACIÓN INICIAL ROBUSTA (SSO DESDE EL HUB) =================
       async function inicializarAutenticacion() {
         const loginScreen = document.getElementById("login-screen");
     
-        // Revisar si viene lanzado desde el Hub con tokens en la URL (#)
-        const hash = window.location.hash.substring(1);
-        const params = new URLSearchParams(hash);
-        const accessToken = params.get("sso_access_token");
-        const refreshToken = params.get("sso_refresh_token");
+        // 1.1. Extraer parámetros del Hash (#) o del Query (? por si acaso)
+        const hash = window.location.hash.startsWith("#") ? window.location.hash.substring(1) : window.location.hash;
+        const searchParams = new URLSearchParams(hash || window.location.search);
     
+        const accessToken = searchParams.get("sso_access_token");
+        const refreshToken = searchParams.get("sso_refresh_token");
+    
+        // Si viene desde el Launcher con tokens
         if (accessToken && refreshToken) {
-          const { data, error } = await supabaseClient.auth.setSession({
-            access_token: decodeURIComponent(accessToken),
-            refresh_token: decodeURIComponent(refreshToken)
-          });
+          try {
+            const tokenDecodificado = decodeURIComponent(accessToken);
+            const refreshDecodificado = decodeURIComponent(refreshToken);
     
-          // Limpiar URL
-          history.replaceState(null, "", window.location.pathname + window.location.search);
+            const { data, error } = await supabaseClient.auth.setSession({
+              access_token: tokenDecodificado,
+              refresh_token: refreshDecodificado
+            });
     
-          if (!error && data?.session) {
-            darAcceso(data.session.user);
-            return;
+            if (error) {
+              console.error("Error al inyectar sesión SSO:", error.message);
+            } else if (data?.session) {
+              // Limpiar la URL del navegador sin recargar
+              history.replaceState(null, "", window.location.pathname + window.location.search);
+              darAcceso(data.session.user);
+              return; // Listo, entró sin pedir contraseña
+            }
+          } catch (err) {
+            console.error("Fallo inesperado leyendo tokens SSO:", err);
           }
         }
     
-        // Revisar si ya tenía sesión activa en este navegador
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (session) {
-          darAcceso(session.user);
-        } else {
-          // Si no hay sesión válida, mantener pantalla de login activa
-          loginScreen.classList.remove("hidden");
-          lucide.createIcons();
+        // 1.2. Si no venía por URL, revisar si ya tenía sesión local guardada
+        try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          if (session) {
+            darAcceso(session.user);
+            return;
+          }
+        } catch (e) {
+          console.warn("No hay sesión activa local:", e);
         }
+    
+        // 1.3. Solo si NO vino con token y NO hay sesión guardada, mostrar login
+        loginScreen.classList.remove("hidden");
+        if (window.lucide) lucide.createIcons();
       }
     
       // ================= 2. ENTRADA A LA APLICACIÓN =================
