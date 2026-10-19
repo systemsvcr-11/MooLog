@@ -926,11 +926,14 @@
       }
 
       function cerrarSesion() {
-        localStorage.removeItem('packflow_session');
-        activeUser = null;
-        // Redirige al portal para limpiar el ciclo
-        window.location.href = "https://funny-muffin-67cb71.netlify.app/";
-      }
+      localStorage.removeItem('packflow_session');
+      activeUser = null;
+      mostrarPantallaLogin(true);
+      const u = document.getElementById('login-user');
+      const p = document.getElementById('login-pass');
+      if (u) u.value = '';
+      if (p) p.value = '';
+    }
     
       function aplicarPermisosRol() {
         if (!activeUser) return;
