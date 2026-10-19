@@ -56,18 +56,14 @@
             <div class="space-y-2">
                 <h2 class="text-2xl font-bold text-slate-900">Módulo no disponible</h2>
                 <p class="text-sm text-gray-500">
-                    Tu usuario (<span id="denied-user-email" class="font-semibold text-slate-700"></span>) no cuenta con permisos para acceder a <strong>MooLog!</strong>.
+                    Tu usuario (<span id="denied-user-email" class="font-semibold text-slate-700"></span>) no cuenta con permisos para acceder a este módulo.
                 </p>
             </div>
-            <div class="pt-2 flex flex-col gap-2">
-                <!-- Botón para regresar al portal principal -->
-                <a href="https://tu-usuario.github.io/tu-portal/" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition-colors flex items-center justify-center space-x-2">
+            <div class="pt-2">
+                <!-- Botón seguro: Regresa a la ventana anterior o a tu URL real del Hub -->
+                <button onclick="volverAlMenu()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition-colors flex items-center justify-center space-x-2">
                     <i data-lucide="layout-grid" class="w-4 h-4"></i>
                     <span>Volver al Menú Principal</span>
-                </a>
-                <!-- Botón para cambiar de cuenta si entró con la equivocada -->
-                <button onclick="cerrarSesion()" class="w-full py-2 bg-slate-150 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-sm transition-colors">
-                    Iniciar con otra cuenta
                 </button>
             </div>
         </div>
@@ -794,7 +790,7 @@
        }
         
       // ================= 2. ENTRADA EXITOSA A LA APP =================
-      const MODULO_ID = "moolog";
+      const MODULO_ID = "Moolog";
       function autenticarUsuarioEnUI(user) {
             const loginScreen = document.getElementById("login-screen");
             const deniedScreen = document.getElementById("denied-screen");
