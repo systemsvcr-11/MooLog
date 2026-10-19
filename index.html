@@ -768,62 +768,53 @@
       let productoSeleccionadoIns = "";
     
       // ================= INICIALIZACIÓN Y SSO SEGURO =================
-      window.addEventListener('DOMContentLoaded', () => {
-        if (window.lucide) lucide.createIcons();
-        
-        const dateSpan = document.getElementById('current-date');
-        if (dateSpan) {
-          dateSpan.innerText = `Fecha: ${new Date().toLocaleDateString()}`;
-        }
-    
-        // 1. Escuchar credenciales automáticas desde el Launcher si viene por ventana emergente
-        if (window.opener) {
-          window.addEventListener("message", async (event) => {
-            if (event.data?.tipo === "RESPUESTA_CREDENCIALES_SSO") {
-              const { usuario, clave } = event.data;
-              const userInput = document.getElementById('login-user');
-              const passInput = document.getElementById('login-pass');
-    
-              if (userInput && passInput) {
-                userInput.value = usuario || '';
-                passInput.value = clave || '';
-                // Auto-login contra Google Sheets
-                await intentarLogin();
-              }
-            }
-          });
-    
-          // Solicitar las credenciales al Launcher padre
-          window.opener.postMessage({ tipo: "SOLICITAR_CREDENCIALES_SSO" }, "*");
-    
-          // Tiempo de espera para mostrar login manual si el launcher no responde
-          setTimeout(() => {
-            const userInput = document.getElementById('login-user');
-            if (!activeUser && (!userInput || !userInput.value)) {
-              mostrarPantallaLogin(true);
-            }
-          }, 2500);
-          return;
-        }
-    
-        // 2. Si se abrió de forma independiente, verificar sesión persistente guardada
-        const savedSession = localStorage.getItem('packflow_session');
-        if (savedSession) {
-          try {
-            activeUser = JSON.parse(savedSession);
-            mostrarPantallaLogin(false);
-            aplicarPermisosRol();
-            cargarDatosDeSheets();
-            return;
-          } catch (e) {
-            localStorage.removeItem('packflow_session');
+        window.addEventListener('DOMContentLoaded', async () => {
+          if (window.lucide) lucide.createIcons();
+          
+          const dateSpan = document.getElementById('current-date');
+          if (dateSpan) {
+            dateSpan.innerText = `Fecha: ${new Date().toLocaleDateString()}`;
           }
-        }
-    
-        // 3. Fallback: mostrar pantalla de login manual
-        mostrarPantallaLogin(true);
-      });
-    
+        
+          // 1. Revisar si vienen credenciales temporales desde el Launcher (misma pestaña)
+          const tempUser = sessionStorage.getItem("sso_temp_user");
+          const tempPass = sessionStorage.getItem("sso_temp_pass");
+        
+          if (tempUser && tempPass) {
+            // Borrar de inmediato para no dejar rastro en el navegador
+            sessionStorage.removeItem("sso_temp_user");
+            sessionStorage.removeItem("sso_temp_pass");
+        
+            const userInput = document.getElementById('login-user');
+            const passInput = document.getElementById('login-pass');
+        
+            if (userInput && passInput) {
+              userInput.value = tempUser;
+              passInput.value = tempPass;
+              // Ejecutar auto-login
+              await intentarLogin();
+              return;
+            }
+          }
+        
+          // 2. Si no venía de un redireccionamiento, revisar sesión guardada localmente
+          const savedSession = localStorage.getItem('packflow_session');
+          if (savedSession) {
+            try {
+              activeUser = JSON.parse(savedSession);
+              mostrarPantallaLogin(false);
+              aplicarPermisosRol();
+              await cargarDatosDeSheets();
+              return;
+            } catch (e) {
+              localStorage.removeItem('packflow_session');
+            }
+          }
+        
+          // 3. Fallback: mostrar login manual
+          mostrarPantallaLogin(true);
+        });
+            
       function mostrarPantallaLogin(visible) {
         const screen = document.getElementById('login-screen');
         if (!screen) return;
