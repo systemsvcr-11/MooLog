@@ -757,41 +757,41 @@
 
       // ================= 1. RECEPTOR SSO Y VERIFICACIÓN INICIAL =================
       async function inicializarAutenticacion() {
-        const loginScreen = document.getElementById("login-screen");
-        
-        // 1.1. Verificar si viene lanzado desde el Hub con tokens en el hash (#)
-        const hash = window.location.hash.substring(1);
-        const params = new URLSearchParams(hash);
-        const accessToken = params.get("sso_access_token");
-        const refreshToken = params.get("sso_refresh_token");
+          const loginScreen = document.getElementById("login-screen");
           
-
-        if (accessToken && refreshToken) {
-          // Inyectar tokens de sesión en el cliente local
-          const { data, error } = await supabaseClient.auth.setSession({
-            access_token: decodeURIComponent(accessToken),
-            refresh_token: decodeURIComponent(refreshToken)
-          });
-
-          // Limpiar la URL de inmediato para ocultar los tokens del historial
-          history.replaceState(null, "", window.location.pathname + window.location.search);
-
-          if (!error && data?.session) {
-            autenticarUsuarioEnUI(data.session.user);
-            return;
+          // 1. Verificar si viene lanzado desde el Launcher con tokens en el hash (#)
+          const hash = window.location.hash.substring(1);
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get("sso_access_token");
+          const refreshToken = params.get("sso_refresh_token");
+        
+          if (accessToken && refreshToken) {
+            // Inyectar tokens de sesión en el cliente local
+            const { data, error } = await supabaseClient.auth.setSession({
+              access_token: decodeURIComponent(accessToken),
+              refresh_token: decodeURIComponent(refreshToken)
+            });
+        
+            // Limpiar la URL de inmediato para ocultar los tokens del historial
+            history.replaceState(null, "", window.location.pathname + window.location.search);
+        
+            if (!error && data?.session) {
+              // Pasa el usuario a la función que valida si tiene permiso para este módulo
+              autenticarUsuarioEnUI(data.session.user);
+              return;
+            }
           }
-        }
-
-        // 1.2. Si no venía por URL, verificar si ya existía una sesión guardada previamente
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (session) {
-          autenticarUsuarioEnUI(session.user);
-        } else {
-          // 1.3. Si entró directamente y no tiene sesión: dejamos visible el login
-          loginScreen.classList.remove("hidden");
-          lucide.createIcons();
-        }
-      }
+        
+          // 2. Si no venía por URL, verificar si ya existía una sesión guardada previamente
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          if (session) {
+            autenticarUsuarioEnUI(session.user);
+          } else {
+            // 3. Si entró directamente y no tiene sesión: dejamos visible el login
+            loginScreen.classList.remove("hidden");
+            lucide.createIcons();
+          }
+       }
         
       // ================= 2. ENTRADA EXITOSA A LA APP =================
       const MODULO_ID = "moolog";
